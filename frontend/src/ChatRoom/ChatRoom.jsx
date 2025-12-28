@@ -9,12 +9,12 @@ export default function ChatRoom() {
   const {user,setUser} = useUserData();
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const [error, setError] = useState(null);
+  // const [error, setError] = useState(null);
   const [isSkipping, setIsSkipping] = useState(false);
-  const { socket } = useSocket();
-  const socketRef=useRef(socket);
-  const clientSocket=socketRef.current;
-
+  const { socketRef } = useSocket();
+  const clientSocketRef = socketRef; // ref provided by SocketProvider
+  
+  const [status, setStatus] = useState('initializing');
   const navigate = useNavigate();
 useEffect(()=>{
  const checkLogin=async()=>{
@@ -22,7 +22,6 @@ useEffect(()=>{
   const res=await axios.get(import.meta.env.VITE_BACKEND_URI+"user/check-login",{withCredentials:true});
   if(res.data.user){
     setUser(res.data.user);
-
   }
   else {
         navigate("/login");
@@ -37,103 +36,50 @@ useEffect(()=>{
   if (!user) {
     checkLogin();
   }
-},[navigate, setUser])
-  const { setLocalStream,
-    createOffer,
+  return ()=> setUser(null)
+},[navigate, setUser, user])
+  const {
     createAnswer,
     setRemoteAnswer,
-    addIceCandidate,
-    setOnIceCandidate,
-    getUserMedia,
+    setLocalStream,
     localStream,
+    addIceCandidate,
     remoteStream,
-    connectionState,
     cleanupConnection,
     // setRoomId,
-    initializePeer
+  
   } = usePeer();
-
-const peerRef=useRef(null);
-  useEffect(() => {
-    if(!user) return;
-    if(!clientSocket) return ;
-    const initialize = async () => {
-      try {
-         if (!peerRef.current) {
-    peerRef.current = await initializePeer();
-  }
-   
-        setOnIceCandidate((candidate) => {
-          // console.log('Sending ICE candidate to partner');
-          clientSocket.emit('ice-candidate', { candidate });
-        });
-        await getUserMedia({ video: true, audio: true });
-        clientSocket.emit('find-partner');
-      } catch (err) {
-        console.error('Initialization error:', err);
-        if (err.name === 'NotAllowedError') {
-          setError('Camera and microphone access denied. Please allow permissions.');
-        } else if (err.name === 'NotFoundError') {
-          setError('No camera or microphone found.');
-        } else {
-          setError('Failed to access camera and microphone.');
-        }
-        // setStatus('error');
-      }
-    };
-
-    initialize();
-
-    // Cleanup ONLY on unmount
-    return () => {
-      console.log('ChatRoom unmounting, cleaning up...');
-      peerRef.current = null;
-      cleanupConnection();
-      if (clientSocket) {
-        clientSocket.emit('leave-room');
-      }
-    };
-  }, [initializePeer]);
-
+  
   //  Handle partner found
- const handlePartner = useCallback(async ({roomId, shouldCreateOffer}) => {
-    console.log('Partner found!', {roomId, shouldCreateOffer});
-    if (shouldCreateOffer) {
-      try { 
-        console.log('Creating offer for partner...');
-        const offer = await createOffer();
-        clientSocket.emit('offer', {offer});
-      } catch (err) {
-        console.error('Error creating offer:', err);
-      }
-    }
-  }, [createOffer, clientSocket]);
+ 
 
   //  Handle receiving offer from partner
-  const handlePartnerOffer = useCallback(async ({offer}) => {
-    console.log(' Received offer from partner');
+  const handlePartnerOffer = useCallback(async ({ offer, roomId }) => {
+    const clientSocket = clientSocketRef?.current;
+    console.log(' Received offer from partner in roomId', roomId);
     try {
       const answer = await createAnswer(offer);
       console.log('Sending answer to partner');
-      clientSocket.emit('answer', {answer});
+      if (clientSocket) clientSocket.emit('answer', { answer, roomId });
     } catch (err) {
       console.error('Error creating answer:', err);
     }
-  }, [createAnswer, clientSocket]);
+  }, [createAnswer, clientSocketRef]);
 
   // Handle receiving answer from partner
-  const handlePartnerAnswer = useCallback(async ({answer}) => {
-    console.log('Received answer from partner');
+  const handlePartnerAnswer = useCallback(async ({ answer, roomId }) => {
+    console.log('Received answer from partner in roomId', roomId);
     try {
-      await setRemoteAnswer(answer); 
+      await setRemoteAnswer(answer);
       console.log('Remote answer set successfully');
+      setStatus('connected');
     } catch (err) {
       console.error('Error setting remote answer:', err);
     }
   }, [setRemoteAnswer]);
 
   //  Handle ICE candidates (critical for connection!)
-  const handleIceCandidate = useCallback(({candidate}) => {
+  const handleIceCandidate = useCallback(({ candidate }) => {
     console.log('Received ICE candidate from partner');
     addIceCandidate(candidate);
   }, [addIceCandidate]);
@@ -146,81 +92,53 @@ const peerRef=useRef(null);
 
   // Handle partner disconnection
   const handlePartnerDisconnected = useCallback(() => {
+    const clientSocket = clientSocketRef?.current;
     console.log(' Partner disconnected');
-    
     if (!isSkipping) {
-      // Partner left, auto-search for new one
-      // setStatus('searching');
       cleanupConnection();
-      clientSocket.emit('find-partner');
+      if (clientSocket) clientSocket.emit('find-partner');
+      setStatus('searching');
     }
-  }, [cleanupConnection, clientSocket, isSkipping]);
+  }, [cleanupConnection, clientSocketRef, isSkipping]);
 
   // Set up all clientSocket listeners
   useEffect(() => {
+    const clientSocket = clientSocketRef?.current;
     if (!clientSocket) return;
-    if(!user) return;
-    clientSocket.on('partner-found', handlePartner);
-    clientSocket.on('offer', handlePartnerOffer);
-    clientSocket.on('answer', handlePartnerAnswer);
-    clientSocket.on('ice-candidate', handleIceCandidate);
-    // clientSocket.on('waiting', handleWaiting);
+    if (!user) return;
+
+    clientSocket.on('offer-created', handlePartnerOffer);
+    clientSocket.on('answer-created', handlePartnerAnswer);
+    clientSocket.on('new-ice-candidate', handleIceCandidate);
+  
     clientSocket.on('partner-disconnected', handlePartnerDisconnected);
 
     return () => {
-      clientSocket.off('partner-found', handlePartner);
-      clientSocket.off('offer', handlePartnerOffer);
-      clientSocket.off('answer', handlePartnerAnswer);
-      clientSocket.off('ice-candidate', handleIceCandidate);
-      // clientSocket.off('waiting', handleWaiting);
+    
+      clientSocket.off('offer-created', handlePartnerOffer);
+      clientSocket.off('answer-created', handlePartnerAnswer);
+      clientSocket.off('new-ice-candidate', handleIceCandidate);
       clientSocket.off('partner-disconnected', handlePartnerDisconnected);
     };
-  }, [
-    clientSocket,
-    handlePartner,
-    handlePartnerOffer,
-    handlePartnerAnswer,
-    handleIceCandidate,
-    // handleWaiting,
-    handlePartnerDisconnected,
-  ]);
-
-  //  Monitor connection state and update status
-  useEffect(() => {
-    console.log('Connection state changed:', connectionState);
+  }, [clientSocketRef, handlePartnerOffer, handlePartnerAnswer, handleIceCandidate, handlePartnerDisconnected, user]);
+  const cleanLocalStream = useCallback(() => {
     
-    if (connectionState === 'connected') {
-      // setStatus('connected');
-      console.log(' Connection fully established!');
-    } else if (connectionState === 'failed') {
-      console.error('Connection failed');
-      handlePartnerDisconnected();
-    } else if (connectionState === 'disconnected') {
-      console.log('Connection lost');
-      handlePartnerDisconnected();
+    if (localStream) {
+      try { localStream.getTracks().forEach((t) => t.stop()); } catch (err) { console.warn('error stopping local tracks', err); }
+      setLocalStream(null);
     }
-  }, [connectionState, handlePartnerDisconnected]);
-
-  const cleanLocalStream=()=>{
-      if (peerRef.current) {
-    peerRef.current.getSenders().forEach(sender => {
-      peerRef.current.removeTrack(sender);
-    });
-    peerRef.current.close();
-  }
-  localStream.getTracks().forEach(t=>t.stop());
-  localVideoRef.current.srcObject=null;
-  setLocalStream(null);
-  }
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    setStatus('initializing');
+  }, [ localStream, setLocalStream]);
   // Set local video stream
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
-    () => {
-    cleanLocalStream();
-  };
-  }, [localStream]);
+    return () => {
+      cleanLocalStream();
+    };
+  }, [cleanLocalStream, localStream]);
 
   // Set remote video stream and remove blur
   useEffect(() => {
@@ -236,7 +154,8 @@ const peerRef=useRef(null);
     setIsSkipping(true);
     // setStatus('searching');
     cleanupConnection();
-    clientSocket.emit('find-partner');
+    const clientSocket = clientSocketRef?.current;
+    if (clientSocket) clientSocket.emit('find-partner');
   };
 
   // Handle disconnect and go back home

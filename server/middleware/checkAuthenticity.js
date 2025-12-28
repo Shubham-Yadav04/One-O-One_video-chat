@@ -30,7 +30,7 @@ const authChecker = async (req, res, next) => {
           sameSite: "Strict",
           maxAge: 15*60* 1000, 
         });
-
+ 
         req.user = payload;
         return next();
       } catch (err) {

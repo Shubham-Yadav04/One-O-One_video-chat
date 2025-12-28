@@ -1,33 +1,47 @@
 
 
 import { useSocket } from "../ContextProviders/Socket";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePeer } from "../ContextProviders/Peer";
+// import { usePeer } from "../ContextProviders/Peer";
 import UserProfile from "./components/UserProfile";
 import DashBoardNavbar from "./components/DashBoardNavbar";
 import { useUserData } from "../ContextProviders/User";
 import axios from 'axios'
+import io from 'socket.io-client'
+import { usePeer } from "../ContextProviders/Peer";
 function Dashboard() {
-  const { peer, createOffer, setRemoteAnswer } = usePeer();
-  const { socket } = useSocket();
   const { setUser, user } = useUserData();
   const navigate = useNavigate();
+  const {initializePeer,setLocalStream}=usePeer()
+let {socketRef,setIsConnected,socket}= useSocket();
 
-  // --- ensure sessionId ---
+  const clientSocketRef = socketRef; 
   useEffect(() => {
-    let sessionId = sessionStorage.getItem("sessionId");
-    if (!sessionId) {
-      sessionId = crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
-      sessionStorage.setItem("sessionId", sessionId);
-    }
-  }, []);
+    // connect socket only once
+    const socket = io("http://localhost:8001", {
+      withCredentials: true,
+      transports: ["websocket"],
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id);
+      setIsConnected(true);
+    });
+
+    socket.on("disconnect", () => {
+      console.log(" Socket disconnected");
+      setIsConnected(false);
+    });
+  }, [setIsConnected, socketRef]);
 
   // --- check login ---
   const checkLogin = useCallback(async () => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URI}check-login`,
+        `${import.meta.env.VITE_BACKEND_URI}user/check-login`,
         { withCredentials: true }
       );
       setUser(response.data.user);
@@ -41,90 +55,41 @@ function Dashboard() {
     checkLogin();
   }, [checkLogin]);
 
-  // ---- WebRTC signaling ----
-  const handlePaired = useCallback(
-    async ({ peerId }) => {
-      console.log("Paired with:", peerId);
-
-      // create offer (initiator)
-      const offer = await createOffer();
-      await peer.setLocalDescription(offer);
-
-      socket.emit("offer", { to: peerId, sdp: offer });
-      // Navigate to chatroom (UI route)
-      navigate(`/chatroom/${peerId}`);
-    },
-    [peer, socket, navigate, createOffer]
-  );
-
-  const handleOffer = useCallback(
-    async ({ from, sdp }) => {
-      console.log("Received offer from:", from);
-      await peer.setRemoteDescription(new RTCSessionDescription(sdp));
-
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-
-      socket.emit("answer", { to: from, sdp: answer });
-      navigate(`/chatroom/${from}`);
-    },
-    [peer, socket, navigate]
-  );
-
-  const handleAnswer = useCallback(
-    async ({ from, sdp }) => {
-      console.log("Received answer from:", from);
-      await setRemoteAnswer(new RTCSessionDescription(sdp));
-    },
-    [setRemoteAnswer]
-  );
-
-  const handleIce = useCallback(
-    async ({ from, candidate }) => {
-      try {
-        await peer.addIceCandidate(new RTCIceCandidate(candidate));
-        console.log("Added ICE from:", from);
-      } catch (err) {
-        console.error("Error adding ICE:", err);
-      }
-    },
-    [peer]
-  );
-
-  // Register socket events
-  useEffect(() => {
-    socket.on("paired", handlePaired);
-    socket.on("offer", handleOffer);
-    socket.on("answer", handleAnswer);
-    socket.on("ice", handleIce);
-
-    return () => {
-      socket.off("paired", handlePaired);
-      socket.off("offer", handleOffer);
-      socket.off("answer", handleAnswer);
-      socket.off("ice", handleIce);
-    };
-  }, [socket, handlePaired, handleOffer, handleAnswer, handleIce]);
-
-  // Local ICE candidates
-  useEffect(() => {
-    if (!peer) return;
-    peer.onicecandidate = (event) => {
-      if (event.candidate) {
-        const peerId = sessionStorage.getItem("peerId");
-        socket.emit("ice", { to: peerId, candidate: event.candidate });
-      }
-    };
-  }, [peer, socket]);
-
-  // --- start random chat ---
   const handleRandomChat = async () => {
-    socket.emit("find-random", {
+    console.log("Starting random chat for user:", user);
+    socket.emit("find-partner", {
       email: user?.email,
       sessionId: sessionStorage.getItem("sessionId"),
     });
   };
+const handlePartnerFound = useCallback(async ({ roomId, shouldCreateOffer }) => {
+  const clientSocket = clientSocketRef?.current;
+  console.log('Partner found payload', { roomId, shouldCreateOffer });
+  if (!user) return;
+  if (!clientSocket) return;
+  // setStatus('connecting');
+  try {
+    const result = await initializePeer(clientSocket, shouldCreateOffer, roomId);
+    // initializePeer returns { peer, localStream }
+    if (result && result.localStream) {
+      setLocalStream(result.localStream);
+    }
+    console.log(' Partner found, initialized peer connection');
+    navigate("/chatroom");
+  } catch (err) {
+    console.error('Error initializing peer:', err);
+  }
+}, [clientSocketRef, initializePeer, navigate, setLocalStream, user]);
 
+useEffect(()=>{
+    if (socket) {
+      socket.on("partner-found", handlePartnerFound);
+    }
+    return()=>{
+      if(socket)
+      socket.off("partner-found", handlePartnerFound);
+    }
+})
   const handleLogout = () => {
     navigate("/login");
   };
@@ -133,7 +98,7 @@ function Dashboard() {
     <div
       className={`h-fit transition-colors duration-300 bg-neutral-100 dark:bg-[#111] text-black dark:text-neutral-60`}
     >
-      {user ? (
+     {user ? (
         <>
           <DashBoardNavbar handleLogout={handleLogout} />
           <div className="max-w-7xl mx-auto px-6 py-8">

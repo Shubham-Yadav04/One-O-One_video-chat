@@ -1,76 +1,92 @@
-
 import express from "express";
 import { Server } from "socket.io";
 import http from "http";
-import userRouter from "./routes/userRoute.js"
+import crypto from "crypto";
+import userRouter from "./routes/userRoute.js";
 import { connectDb } from "./dbConfig/connectDB.js";
-import cors from 'cors'
+import cors from "cors";
 import cookieParser from "cookie-parser";
+
+import passport from "./config/passportConfig.js";
 // import { createClient } from "redis";
 
 const app = express();
-const server = http.createServer(); 
+const server = http.createServer();
+// socket.io attached to a dedicated http server (port configured below)
 const io = new Server(server, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"] 
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
-app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    credentials: true,
+  })
+);
 
+await connectDb();
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-connectDb()
+// Passport initialization
+app.use(passport.initialize());
+
 app.get("/health", (req, res) => res.send("OK"));
 app.get("/session/:id", async (req, res) => {
   const session = await getSession(req.params.id);
   return res.json(session ?? {});
 });
-app.use('/user',userRouter);
+app.use("/user", userRouter);
 const rooms = new Map();
 const socketToRoom = new Map();
 const waitingUsers = [];
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
   console.log("Transport:", socket.conn.transport.name);
-  
-  socket.on('upgrade', () => {
+
+  socket.on("upgrade", () => {
     console.log(`${socket.id} upgraded to:`, socket.conn.transport.name);
   });
 
-  socket.on('find-partner', () => {
+  socket.on("find-partner", () => {
     console.log(`${socket.id} is looking for a partner...`);
-    
-    // if (socketToRoom.has(socket.id)) {
-    //   console.log(`${socket.id} is already in a conversation`);
-    //   socket.emit('error', { message: 'Already in a conversation' });
-    //   return;
-    // }
 
-    if (waitingUsers.includes(socket.id)) {
-      console.log(`${socket.id} is already in waiting list`);
+    if (socketToRoom.has(socket.id)) {
+      console.log(`${socket.id} is already in a conversation`);
+      socket.emit("error", { message: "Already in a conversation" });
       return;
     }
 
     if (waitingUsers.length > 0) {
-      const partnerId = waitingUsers.shift();
-      const partnerSocket = io.sockets.sockets.get(partnerId); // getting the partner socket through its socket id 
+      const randomIndexDecimal = Math.random();
+      const randomIndex = Math.floor(randomIndexDecimal * waitingUsers.length);
+      const partnerId = waitingUsers[randomIndex];
+      const partnerSocket = io.sockets.sockets.get(partnerId); 
       
+      // console.log(partnerSocket)
+      
+      // getting the partner socket through its socket id
+
+      // if (!partnerSocket) {
+      //   console.log(`Partner ${partnerId} disconnected, searching again...`);
+      //   if (waitingUsers.length > 0) {
+      //     socket.emit('find-partner');
+      //   } else {
+      //     waitingUsers.push(socket.id);
+      //     socket.emit('waiting');
+      //   }
+      //   return;
+      // }
+
       if (!partnerSocket) {
-        console.log(`Partner ${partnerId} disconnected, searching again...`);
-        if (waitingUsers.length > 0) {
-          socket.emit('find-partner');
-        } else {
-          waitingUsers.push(socket.id);
-          socket.emit('waiting');
-        }
+        // partner disconnected unexpectedly, remove them from waiting list and retry
+        waitingUsers.splice(randomIndex, 1);
+        socket.emit("waiting");
         return;
       }
 
@@ -79,60 +95,75 @@ io.on('connection', (socket) => {
       socketToRoom.set(partnerId, roomId);
       socketToRoom.set(socket.id, roomId);
 
+      // remove partner from waiting list
+      waitingUsers.splice(randomIndex, 1);
+
       socket.join(roomId);
       partnerSocket.join(roomId);
 
       console.log(`Matched ${partnerId} with ${socket.id} in room ${roomId}`);
 
-      io.to(partnerId).emit('partner-found', { 
-        roomId, 
-        shouldCreateOffer: true 
+      // Tell one side to create the offer (the waiting partner), and the other to wait
+      partnerSocket.emit("partner-found", {
+        roomId,
+        shouldCreateOffer: true,
       });
-      io.to(socket.id).emit('partner-found', { 
-        roomId, 
-        shouldCreateOffer: false 
+
+      socket.emit("partner-found", {
+        roomId,
+        shouldCreateOffer: false,
       });
     } else {
+      if (waitingUsers.includes(socket.id)) {
+        console.log(`${socket.id} is already in waiting list`);
+        return;
+      }
       waitingUsers.push(socket.id);
-      socket.emit('waiting');
+      socket.emit("waiting");
     }
   });
 
-  socket.on('offer', ({ offer }) => {
+  socket.on("offer", ({ offer }) => {
     const roomId = socketToRoom.get(socket.id);
     if (!roomId) {
-      
       return;
     }
+    const partnerId =
+      rooms.get(roomId).user1 === socket.id
+        ? rooms.get(roomId).user2
+        : rooms.get(roomId).user1;
 
-    socket.to(roomId).emit('offer', { offer });
+    socket.to(partnerId).emit("offer-created", { offer, roomId });
   });
 
-  socket.on('answer', ({ answer }) => {
+  socket.on("answer", ({ answer, roomId }) => {
+    if (!roomId) return;
+    const partnerId =
+      rooms.get(roomId).user1 === socket.id
+        ? rooms.get(roomId).user2
+        : rooms.get(roomId).user1;
+    socket.to(partnerId).emit("answer-created", { answer, roomId });
+  });
+
+  socket.on("ice-candidate", ({ candidate }) => {
     const roomId = socketToRoom.get(socket.id);
     if (!roomId) return;
-   
-    socket.to(roomId).emit('answer', { answer });
+    const partnerId =
+      rooms.get(roomId).user1 === socket.id
+        ? rooms.get(roomId).user2
+        : rooms.get(roomId).user1;
+    socket.to(partnerId).emit("new-ice-candidate", { candidate });
   });
 
-  socket.on('ice-candidate', ({ candidate }) => {
-    const roomId = socketToRoom.get(socket.id);
-    if (!roomId) return;
-    
-    socket.to(roomId).emit('ice-candidate', { candidate });
-  });
-
-  socket.on('skip-partner', () => {
+  socket.on("skip-partner", () => {
     handleDisconnect(socket);
   });
 
-  socket.on('leave-room', () => {
-
+  socket.on("leave-room", () => {
     handleDisconnect(socket);
   });
 
-  socket.on('disconnect', () => {
-
+  socket.on("disconnect", () => {
     handleDisconnect(socket);
   });
 
@@ -148,7 +179,7 @@ io.on('connection', (socket) => {
       const room = rooms.get(roomId);
       if (room) {
         const partnerId = room.user1 === socketId ? room.user2 : room.user1;
-        io.to(partnerId).emit('partner-disconnected');
+        io.to(partnerId).emit("partner-disconnected");
         socketToRoom.delete(partnerId);
         const partnerSocket = io.sockets.sockets.get(partnerId);
         if (partnerSocket) {
@@ -163,5 +194,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log("Random 1:1 signaling server running on", PORT));
-server.listen(8001,()=>console.log("socket server running on 8001"))
+app.listen(PORT, () =>
+  console.log("Random 1:1 signaling server running on", PORT)
+);
+server.listen(8001, () => console.log("socket server running on 8001"));

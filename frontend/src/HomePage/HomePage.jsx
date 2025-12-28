@@ -1,6 +1,5 @@
 
 import { useEffect, useState, useMemo } from "react";
-import { useSocket } from "../ContextProviders/Socket.jsx";
 
 import Navbar from "./components/navbar/Navbar.jsx";
 import AnimatedButton from "./components/utils/AnimatedButton.jsx";

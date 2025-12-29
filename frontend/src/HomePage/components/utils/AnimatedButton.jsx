@@ -15,7 +15,7 @@ function AnimatedButton() {
     })
     if(response.data.user){
       setUser(response.data.user)
-      navigate('/chatroom');
+      navigate('/dashboard');
     }
     }
     catch(e){

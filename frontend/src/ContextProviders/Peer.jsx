@@ -127,6 +127,7 @@ export const PeerProvider = ({ children }) => {
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
+      setLocalStream(localStream);
       return { peer, localStream };
     } catch (err) {
       console.warn('Could not get local media:', err);
@@ -134,12 +135,24 @@ export const PeerProvider = ({ children }) => {
     }
   }
   const handleRemoveTrackEvent = (event) => {
-    // best-effort: stop and clear remote stream when tracks removed
-    const s = event.target;
-    if (remoteStream && remoteStream.id === s.id) {
-      try { s.getTracks().forEach((t) => t.stop()); } catch (err) { console.warn('error stopping removed tracks', err); }
-      setRemoteStream(null);
+    const stream = event.target; // MediaStream
+  const removedTrack = event.track;
+
+  setRemoteStream((prevStream) => {
+    if (!prevStream || prevStream.id !== stream.id) {
+      return prevStream;
     }
+    const remainingTracks = prevStream
+      .getTracks()
+      .filter((t) => t.id !== removedTrack.id);
+
+    if (remainingTracks.length === 0) {
+      return null; // no media left
+    }
+
+    const newStream = new MediaStream(remainingTracks);
+    return newStream;
+  });
   };
  
   const addIceCandidate = async (candidate) => {

@@ -3,7 +3,8 @@ import { useSocket } from "../ContextProviders/Socket";
 import { useNavigate } from "react-router-dom";
 import { useRef,useState,useEffect,useCallback } from "react";
 import { usePeer } from "../ContextProviders/Peer";
-import axios from "axios";
+// import axios from "axios";
+// import { set } from "mongoose";
 // ChatRoom.jsx - All connection logic here
 export default function ChatRoom() {
   const {user,setUser} = useUserData();
@@ -16,28 +17,25 @@ export default function ChatRoom() {
   
   const [status, setStatus] = useState('initializing');
   const navigate = useNavigate();
-useEffect(()=>{
- const checkLogin=async()=>{
-  try{
-  const res=await axios.get(import.meta.env.VITE_BACKEND_URI+"user/check-login",{withCredentials:true});
-  if(res.data.user){
-    setUser(res.data.user);
-  }
-  else {
-        navigate("/login");
-      }
-  }
-  catch(err){
-    navigate('/login');
-    console.error("Login check failed",err);
-  }
+// useEffect(()=>{
+//  const checkLogin=async()=>{
+//   try{
+//   const res=await axios.get(import.meta.env.VITE_BACKEND_URI+"user/check-login",{withCredentials:true});
+//   if(res.data.user){
+//     setUser(res.data.user);
+//   }
+//   else {
+//         navigate("/login");
+//       }
+//   }
+//   catch(err){
+//     navigate('/login');
+//     console.error("Login check failed",err);
+//   }
 
- }
-  if (!user) {
-    checkLogin();
-  }
-  return ()=> setUser(null)
-},[navigate, setUser, user])
+//  }
+
+// },[navigate, setUser, user])
   const {
     createAnswer,
     setRemoteAnswer,
@@ -47,12 +45,8 @@ useEffect(()=>{
     remoteStream,
     cleanupConnection,
     // setRoomId,
-  
   } = usePeer();
-  
   //  Handle partner found
- 
-
   //  Handle receiving offer from partner
   const handlePartnerOffer = useCallback(async ({ offer, roomId }) => {
     const clientSocket = clientSocketRef?.current;
@@ -68,28 +62,28 @@ useEffect(()=>{
 
   // Handle receiving answer from partner
   const handlePartnerAnswer = useCallback(async ({ answer, roomId }) => {
+     const clientSocket = clientSocketRef?.current;
     console.log('Received answer from partner in roomId', roomId);
     try {
       await setRemoteAnswer(answer);
       console.log('Remote answer set successfully');
-      setStatus('connected');
+      clientSocket.emit("answer-recieved");
+      setStatus('connected'); 
     } catch (err) {
       console.error('Error setting remote answer:', err);
     }
-  }, [setRemoteAnswer]);
-
+  }, [clientSocketRef, setRemoteAnswer]);
+const handleConnectionEstablished=useCallback(()=>{
+  setStatus('connected');
+  if(isSkipping){
+    setIsSkipping(false);
+  }
+},[isSkipping])
   //  Handle ICE candidates (critical for connection!)
   const handleIceCandidate = useCallback(({ candidate }) => {
     console.log('Received ICE candidate from partner');
     addIceCandidate(candidate);
   }, [addIceCandidate]);
-
-  // // Handle waiting state
-  // const handleWaiting = useCallback(() => {
-  //   console.log('Waiting for a partner...');
-  //   setStatus('searching');
-  // }, []);
-
   // Handle partner disconnection
   const handlePartnerDisconnected = useCallback(() => {
     const clientSocket = clientSocketRef?.current;
@@ -110,17 +104,17 @@ useEffect(()=>{
     clientSocket.on('offer-created', handlePartnerOffer);
     clientSocket.on('answer-created', handlePartnerAnswer);
     clientSocket.on('new-ice-candidate', handleIceCandidate);
-  
     clientSocket.on('partner-disconnected', handlePartnerDisconnected);
-
+clientSocket.on("connection-established",handleConnectionEstablished);
     return () => {
-    
+      
       clientSocket.off('offer-created', handlePartnerOffer);
       clientSocket.off('answer-created', handlePartnerAnswer);
+      clientSocket.off('connection-established',handleConnectionEstablished);
       clientSocket.off('new-ice-candidate', handleIceCandidate);
       clientSocket.off('partner-disconnected', handlePartnerDisconnected);
     };
-  }, [clientSocketRef, handlePartnerOffer, handlePartnerAnswer, handleIceCandidate, handlePartnerDisconnected, user]);
+  }, [clientSocketRef, handlePartnerOffer, handlePartnerAnswer, handleIceCandidate, handlePartnerDisconnected, user, handleConnectionEstablished]);
   const cleanLocalStream = useCallback(() => {
     
     if (localStream) {
@@ -152,8 +146,9 @@ useEffect(()=>{
   const handleSkip = () => {
     console.log('⏭ Skipping to next partner...');
     setIsSkipping(true);
-    // setStatus('searching');
+    setStatus('searching');
     cleanupConnection();
+    clientSocket.ref.current?.emit("skip-partner");
     const clientSocket = clientSocketRef?.current;
     if (clientSocket) clientSocket.emit('find-partner');
   };

@@ -144,7 +144,17 @@ io.on("connection", (socket) => {
         : rooms.get(roomId).user1;
     socket.to(partnerId).emit("answer-created", { answer, roomId });
   });
-
+socket.on("answer-recieved",()=>{
+  const roomId = socketToRoom.get(socket.id);
+  if (!roomId) {
+    return;
+  }
+  const partnerId =
+    rooms.get(roomId).user1 === socket.id
+      ? rooms.get(roomId).user2
+      : rooms.get(roomId).user1;
+  socket.to(partnerId).emit("connection-established");
+})
   socket.on("ice-candidate", ({ candidate }) => {
     const roomId = socketToRoom.get(socket.id);
     if (!roomId) return;

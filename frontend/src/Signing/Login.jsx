@@ -71,13 +71,12 @@ window.location.href = `${import.meta.env.VITE_BACKEND_URI}user/auth/google`;
       setIsLoading(false);
     }
   };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="h-fit w-[100%] overflow-x-hidden flex items-center justify-center py-8">
+      <div className=" mx-auto w-[30%] min-w-[300px] ">
         {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-4">
+        <div className="text-center mb-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-2">
             <svg
               className="w-8 h-8 text-white"
               fill="none"
@@ -97,8 +96,8 @@ window.location.href = `${import.meta.env.VITE_BACKEND_URI}user/auth/google`;
         </div>
 
         {/* Login Form */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white/20">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-4 border border-white/20 w-full">
+          <form onSubmit={handleSubmit} className="space-y-2">
             {/* Email Field */}
             <div>
               <label
@@ -168,7 +167,7 @@ window.location.href = `${import.meta.env.VITE_BACKEND_URI}user/auth/google`;
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 px-4 rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
@@ -215,7 +214,7 @@ window.location.href = `${import.meta.env.VITE_BACKEND_URI}user/auth/google`;
             <button
               type="button"
               onClick={handleGoogleOauth}
-              className="w-full flex items-center justify-center px-4 py-3 border border-white/20 rounded-lg text-white bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
+              className="w-full flex items-center justify-center px-3 py-2 border border-white/20 rounded-lg text-white bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-200"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path

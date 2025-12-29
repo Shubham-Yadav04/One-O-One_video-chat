@@ -29,7 +29,7 @@ const CallToActionSection = () => {
   ];
 
   return (
-    <section className="py-20 px-4 bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 dark:from-black dark:via-black dark:to-[#111] relative overflow-hidden">
+    <section className="w-full py-20 px-4 bg-gradient-to-br from-purple-900 to-slate-900 dark:from-black dark:via-black dark:to-[#111] relative overflow-hidden">
       <div className="relative max-w-6xl mx-auto text-center">
         {/* Main CTA Content */}
         <motion.div
@@ -60,7 +60,7 @@ const CallToActionSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
           viewport={{ once: true }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
+          className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
         >
           {features.map((feature, index) => (
             <motion.div

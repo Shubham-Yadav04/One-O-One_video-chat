@@ -41,10 +41,40 @@ app.get("/session/:id", async (req, res) => {
   return res.json(session ?? {});
 });
 app.use("/user", userRouter);
-const rooms = new Map();
-const socketToRoom = new Map();
-const waitingUsers = [];
+const waitingQueue = [];           
+const socketToRoom = new Map();   
+const rooms = new Map();    
 
+function tryMatch() {
+  while (waitingQueue.length >= 2) {
+    const user1 = waitingQueue.shift();
+    const user2 = waitingQueue.shift();
+
+    const s1 = io.sockets.sockets.get(user1);
+    const s2 = io.sockets.sockets.get(user2);
+
+    // One disconnected → skip and retry
+    if (!s1 || !s2) {
+      if (s1) waitingQueue.unshift(user1);
+      if (s2) waitingQueue.unshift(user2);
+      continue;
+    }
+
+    const roomId = crypto.randomUUID();
+
+    rooms.set(roomId, { user1, user2 });
+    socketToRoom.set(user1, roomId);
+    socketToRoom.set(user2, roomId);
+
+    s1.join(roomId);
+    s2.join(roomId);
+
+    s1.emit("partner-found", { roomId, shouldCreateOffer: true });
+    s2.emit("partner-found", { roomId, shouldCreateOffer: false });
+
+    console.log(`Matched ${user1} ↔ ${user2} in room ${roomId}`);
+  }
+}
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
   console.log("Transport:", socket.conn.transport.name);
@@ -54,74 +84,17 @@ io.on("connection", (socket) => {
   });
 
   socket.on("find-partner", () => {
-    console.log(`${socket.id} is looking for a partner...`);
+  if (socketToRoom.has(socket.id)) {
+    return socket.emit("error", { message: "Already in a room" });
+  }
 
-    if (socketToRoom.has(socket.id)) {
-      console.log(`${socket.id} is already in a conversation`);
-      socket.emit("error", { message: "Already in a conversation" });
-      return;
-    }
+  if (!waitingQueue.includes(socket.id)) {
+    waitingQueue.push(socket.id);
+    socket.emit("waiting");
+  }
 
-    if (waitingUsers.length > 0) {
-      const randomIndexDecimal = Math.random();
-      const randomIndex = Math.floor(randomIndexDecimal * waitingUsers.length);
-      const partnerId = waitingUsers[randomIndex];
-      const partnerSocket = io.sockets.sockets.get(partnerId); 
-      
-      // console.log(partnerSocket)
-      
-      // getting the partner socket through its socket id
-
-      // if (!partnerSocket) {
-      //   console.log(`Partner ${partnerId} disconnected, searching again...`);
-      //   if (waitingUsers.length > 0) {
-      //     socket.emit('find-partner');
-      //   } else {
-      //     waitingUsers.push(socket.id);
-      //     socket.emit('waiting');
-      //   }
-      //   return;
-      // }
-
-      if (!partnerSocket) {
-        // partner disconnected unexpectedly, remove them from waiting list and retry
-        waitingUsers.splice(randomIndex, 1);
-        socket.emit("waiting");
-        return;
-      }
-
-      const roomId = crypto.randomUUID();
-      rooms.set(roomId, { user1: partnerId, user2: socket.id });
-      socketToRoom.set(partnerId, roomId);
-      socketToRoom.set(socket.id, roomId);
-
-      // remove partner from waiting list
-      waitingUsers.splice(randomIndex, 1);
-
-      socket.join(roomId);
-      partnerSocket.join(roomId);
-
-      console.log(`Matched ${partnerId} with ${socket.id} in room ${roomId}`);
-
-      // Tell one side to create the offer (the waiting partner), and the other to wait
-      partnerSocket.emit("partner-found", {
-        roomId,
-        shouldCreateOffer: true,
-      });
-
-      socket.emit("partner-found", {
-        roomId,
-        shouldCreateOffer: false,
-      });
-    } else {
-      if (waitingUsers.includes(socket.id)) {
-        console.log(`${socket.id} is already in waiting list`);
-        return;
-      }
-      waitingUsers.push(socket.id);
-      socket.emit("waiting");
-    }
-  });
+  tryMatch();
+});
 
   socket.on("offer", ({ offer }) => {
     const roomId = socketToRoom.get(socket.id);
@@ -153,7 +126,7 @@ socket.on("answer-recieved",()=>{
     rooms.get(roomId).user1 === socket.id
       ? rooms.get(roomId).user2
       : rooms.get(roomId).user1;
-  socket.to(partnerId).emit("connection-established");
+  socket.to(partnerId).emit("connection-established",{ roomId });
 })
   socket.on("ice-candidate", ({ candidate }) => {
     const roomId = socketToRoom.get(socket.id);
@@ -178,29 +151,42 @@ socket.on("answer-recieved",()=>{
   });
 
   function handleDisconnect(socket) {
-    const socketId = socket.id;
-    const waitingIndex = waitingUsers.indexOf(socketId);
-    if (waitingIndex > -1) {
-      waitingUsers.splice(waitingIndex, 1);
-    }
+  const socketId = socket.id;
 
-    const roomId = socketToRoom.get(socketId);
-    if (roomId) {
-      const room = rooms.get(roomId);
-      if (room) {
-        const partnerId = room.user1 === socketId ? room.user2 : room.user1;
-        io.to(partnerId).emit("partner-disconnected");
-        socketToRoom.delete(partnerId);
-        const partnerSocket = io.sockets.sockets.get(partnerId);
-        if (partnerSocket) {
-          partnerSocket.leave(roomId);
-        }
-      }
-      rooms.delete(roomId);
-      socketToRoom.delete(socketId);
-      socket.leave(roomId);
-    }
+  // Remove from waiting queue
+  const idx = waitingQueue.indexOf(socketId);
+  if (idx !== -1) {
+    waitingQueue.splice(idx, 1);
   }
+
+  const roomId = socketToRoom.get(socketId);
+  if (!roomId) return;
+
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  const partnerId =
+    room.user1 === socketId ? room.user2 : room.user1;
+
+  const partnerSocket = io.sockets.sockets.get(partnerId);
+
+  // Cleanup room
+  rooms.delete(roomId);
+  socketToRoom.delete(socketId);
+  socketToRoom.delete(partnerId);
+
+  socket.leave(roomId);
+
+  if (partnerSocket) {
+    partnerSocket.leave(roomId);
+    partnerSocket.emit("partner-disconnected");
+
+    waitingQueue.push(partnerId);
+    partnerSocket.emit("waiting");
+  }
+
+  tryMatch();
+}
 });
 
 const PORT = process.env.PORT || 8000;

@@ -15,7 +15,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const {initializePeer,setLocalStream}=usePeer()
 let {socketRef,setIsConnected,socket}= useSocket();
-
+const [waiting,setWaiting]=React.useState(false)
   const clientSocketRef = socketRef; 
   useEffect(() => {
     // connect socket only once
@@ -75,19 +75,25 @@ const handlePartnerFound = useCallback(async ({ roomId, shouldCreateOffer }) => 
       setLocalStream(result.localStream);
     }
     console.log(' Partner found, initialized peer connection');
-    navigate("/chatroom");
+    navigate(`/chatroom/${roomId}`);
   } catch (err) {
     console.error('Error initializing peer:', err);
   }
 }, [clientSocketRef, initializePeer, navigate, setLocalStream, user]);
-
+const handleWaiting=useCallback(()=>[
+  setWaiting(true)
+],[])
 useEffect(()=>{
     if (socket) {
       socket.on("partner-found", handlePartnerFound);
+      socket.on("waiting",handleWaiting)
     }
     return()=>{
-      if(socket)
+      if(socket){
+socket.on("waiting",handleWaiting)
       socket.off("partner-found", handlePartnerFound);
+      }
+        
     }
 })
   const handleLogout = () => {
@@ -96,23 +102,28 @@ useEffect(()=>{
 
   return (
     <div
-      className={`h-fit transition-colors duration-300 bg-neutral-100 dark:bg-[#111] text-black dark:text-neutral-60`}
+      className={`h-screen w-full  transition-colors duration-300 bg-neutral-100 dark:bg-black text-black dark:text-neutral-60`}
     >
      {user ? (
-        <>
+        <div className="w-full">
           <DashBoardNavbar handleLogout={handleLogout} />
           <div className="max-w-7xl mx-auto px-6 py-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="flex md:flex-row flex-col gap-8">
               <UserProfile />
+              <div className="w-full flex items-center justify-center md:h-[300px] ">
+                {
+                  waiting? <h2 className="text-2xl font-semibold text-black dark:text-white">Searching for a partner...</h2>:<h2 className="text-2xl font-semibold">Start a random chat session</h2>
+                }
               <button
                 onClick={handleRandomChat}
-                className="text-2xl font-bold bg-purple-300 p-2 rounded-lg"
+                className="text-2xl font-bold w-fit h-fit bg-purple-300 p-2 rounded-lg"
               >
                 Connect Random
               </button>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   );

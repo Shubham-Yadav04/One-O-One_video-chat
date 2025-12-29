@@ -42,7 +42,9 @@ export const PeerProvider = ({ children }) => {
   if (remoteStream) {
     try {
       remoteStream.getTracks().forEach((t) => t.stop());
-    } catch (e) {}
+    } catch (e) {
+      console.log("Error stopping remote tracks:", e);
+    }
   }
   setRemoteStream(null);
 
@@ -126,6 +128,7 @@ export const PeerProvider = ({ children }) => {
     // Try to get local media and add tracks to the peer
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      console.log('Local media stream obtained',localStream);
       localStream.getTracks().forEach((track) => peer.addTrack(track, localStream));
       setLocalStream(localStream);
       return { peer, localStream };

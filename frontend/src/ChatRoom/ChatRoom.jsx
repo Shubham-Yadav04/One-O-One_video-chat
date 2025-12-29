@@ -43,6 +43,7 @@ export default function ChatRoom() {
     localStream,
     addIceCandidate,
     remoteStream,
+    initializePeer,
     cleanupConnection,
     // setRoomId,
   } = usePeer();
@@ -94,27 +95,47 @@ const handleConnectionEstablished=useCallback(()=>{
       setStatus('searching');
     }
   }, [cleanupConnection, clientSocketRef, isSkipping]);
+const handlePartnerFound = useCallback(async ({ roomId, shouldCreateOffer }) => {
+  const clientSocket = clientSocketRef?.current;
+  console.log('Partner found payload', { roomId, shouldCreateOffer });
+  if (!user) return;
+  if (!clientSocket) return;
+  // setStatus('connecting');
+  try {
+    const result = await initializePeer(clientSocket, shouldCreateOffer, roomId);
+    // initializePeer returns { peer, localStream }
+    if (result && result.localStream) {
+      setLocalStream(result.localStream);
+    }
+    console.log(' Partner found, initialized peer connection');
+    setStatus('connected')
+    navigate(`/chatroom/${roomId}`);
+    
+  } catch (err) {
+    console.error('Error initializing peer:', err);
+  }
+}, [clientSocketRef, initializePeer, navigate, setLocalStream, user]);
 
   // Set up all clientSocket listeners
   useEffect(() => {
     const clientSocket = clientSocketRef?.current;
     if (!clientSocket) return;
     if (!user) return;
-
+clientSocket.on("partner-found", handlePartnerFound);
     clientSocket.on('offer-created', handlePartnerOffer);
     clientSocket.on('answer-created', handlePartnerAnswer);
     clientSocket.on('new-ice-candidate', handleIceCandidate);
     clientSocket.on('partner-disconnected', handlePartnerDisconnected);
 clientSocket.on("connection-established",handleConnectionEstablished);
     return () => {
-      
+      clientSocket.on("partner-found", handlePartnerFound);
       clientSocket.off('offer-created', handlePartnerOffer);
       clientSocket.off('answer-created', handlePartnerAnswer);
       clientSocket.off('connection-established',handleConnectionEstablished);
       clientSocket.off('new-ice-candidate', handleIceCandidate);
       clientSocket.off('partner-disconnected', handlePartnerDisconnected);
     };
-  }, [clientSocketRef, handlePartnerOffer, handlePartnerAnswer, handleIceCandidate, handlePartnerDisconnected, user, handleConnectionEstablished]);
+  }, [clientSocketRef, handlePartnerOffer, handlePartnerAnswer, handleIceCandidate, handlePartnerDisconnected, user, handleConnectionEstablished, handlePartnerFound]);
   const cleanLocalStream = useCallback(() => {
     
     if (localStream) {
@@ -142,13 +163,14 @@ clientSocket.on("connection-established",handleConnectionEstablished);
     }
   }, [remoteStream]);
 
+
   // Handle skip/next partner
   const handleSkip = () => {
     console.log('⏭ Skipping to next partner...');
     setIsSkipping(true);
     setStatus('searching');
     cleanupConnection();
-    clientSocket.ref.current?.emit("skip-partner");
+    clientSocketRef?.current.emit("skip-partner");
     const clientSocket = clientSocketRef?.current;
     if (clientSocket) clientSocket.emit('find-partner');
   };
@@ -280,20 +302,10 @@ setTimeout(() => navigate("/"), 200);// a short delay to ensure cleanup
               cursor:  'pointer',
               fontWeight: 'bold',
               transition: 'all 0.2s',
-              opacity: status === 'initializing' ? 0.5 : 1
+              
             }}
-            onMouseEnter={(e) => {
-              if (status !== 'initializing') {
-                e.target.style.backgroundColor = '#F57C00';
-                e.target.style.transform = 'scale(1.05)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (status !== 'initializing') {
-                e.target.style.backgroundColor = '#FF9800';
-                e.target.style.transform = 'scale(1)';
-              }
-            }}
+           
+       
           >
             ⏭ Skip
           </button>

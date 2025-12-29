@@ -11,10 +11,10 @@ function UserProfile() {
   
   return (
     <div
-            className={`rounded-2xl p-6 shadow-lg bg-white dark:bg-black dark:shadow-md dark:shadow-purple-400`}
+            className={`rounded-2xl flex p-4 shadow-lg w-[35%] min-w-[250px]`}
           >
-            <div className="text-center w-full h-fit">
-              <div className='w-full h-fit flex flex-col gap-2 items-center'>
+            <div className=" h-fit w-full">
+              <div className='h-fit flex flex-col gap-2 items-center justify-center w-full'>
               <div className="inline-block w-[150px] h-[150px]  ">
                 {
                   user.profilePicture?
@@ -34,7 +34,13 @@ function UserProfile() {
                 {user.email}
               </p>
               </div>
-              <div className=" dark:divide-y-[1px] dark:divide-purple-400">
+            </div>
+          </div>
+
+  )
+}
+
+ {/* <div className=" dark:divide-y-[1px] dark:divide-purple-400">
                 <div className="flex justify-between items-end pt-4">
                   <span className="text-neutral-500 dark:text-neutral-400 ">
                     Member since :
@@ -61,11 +67,6 @@ function UserProfile() {
                 </div>
                  <div className="flex justify-between items-end pt-4"> 
                 </div>
-              </div>
-            </div>
-          </div>
-
-  )
-}
+              </div> */}
 
 export default UserProfile

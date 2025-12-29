@@ -6,6 +6,7 @@ import AnimatedButton from "./components/utils/AnimatedButton.jsx";
 import InfoSection from "./components/InfoSection/InfoSection.jsx";
 /* eslint-disable no-unused-vars */
 import { motion, AnimatePresence } from "motion/react";
+import Footer from "./components/InfoSection/components/Footer.jsx";
 function HomePage() {
 
  
@@ -25,11 +26,11 @@ function HomePage() {
     <>
       <div className="w-full relative">
         <div
-          className=" w-full md:max-w-4xl  mx-auto bg-neutral-50 min-h-[50vh] md:min-h-[90vh] bg-transparent flex items-center justify-center flex-col relative z-10"
+          className=" md:max-w-4xl  mx-auto bg-neutral-50 min-h-[50vh] md:min-h-[90vh] bg-transparent flex items-center justify-center flex-col relative z-10"
           id="home"
         >
           <Navbar />
-          <div className="w-fit h-fit flex flex-col items-center justify-center ">
+          <div className="w-full h-fit flex flex-col items-center justify-center ">
           <h1 className=" w-full p-4 text-5xl md:min-w-4xl md:text-7xl font-extrabold tracking-wide text-center text-transparent bg-clip-text bg-gradient-to-b from-purple-600 to-purple-300 !leading-tight overflow-hidden ">
             MEET, TALK & SHARE </h1>
             <AnimatePresence mode="wait">
@@ -72,6 +73,7 @@ function HomePage() {
         </div>
       </div>
       <InfoSection />
+      <Footer/>
     </>
   );
 }

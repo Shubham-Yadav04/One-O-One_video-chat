@@ -5,7 +5,7 @@ import { createAccessToken } from "../utils/createJwt.js";
 
 
 export const checkLogin= async(req ,res)=>{
-  console.log("Checking login for user:", req.user);
+ 
 const user= req.user;
 if(user) return res.status(200).json({
   user

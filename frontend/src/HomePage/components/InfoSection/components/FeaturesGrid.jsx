@@ -45,20 +45,20 @@ const FeaturesGrid = () => {
         "Seamlessly switch between devices during calls. Start on mobile, continue on desktop.",
       gradient: "from-purple-500 to-pink-500",
     },
-    {
-      icon: SecurityIcon,
-      title: "Enterprise Security",
-      description:
-        "Bank-level encryption with end-to-end security and compliance with global standards.",
-      gradient: "from-red-500 to-orange-500",
-    },
-    {
-      icon: GroupIcon,
-      title: "Group Collaboration",
-      description:
-        "Host up to 100 participants with screen sharing, virtual backgrounds, and breakout rooms.",
-      gradient: "from-indigo-500 to-purple-500",
-    },
+    // {
+    //   icon: SecurityIcon,
+    //   title: "Enterprise Security",
+    //   description:
+    //     "Bank-level encryption with end-to-end security and compliance with global standards.",
+    //   gradient: "from-red-500 to-orange-500",
+    // },
+    // {
+    //   icon: GroupIcon,
+    //   title: "Group Collaboration",
+    //   description:
+    //     "Host up to 100 participants with screen sharing, virtual backgrounds, and breakout rooms.",
+    //   gradient: "from-indigo-500 to-purple-500",
+    // },
     {
       icon: GlobalIcon,
       title: "Global Infrastructure",
@@ -69,7 +69,7 @@ const FeaturesGrid = () => {
   ];
 
   return (
-    <section id="features" className="py-20 px-4 bg-white dark:bg-gradient-to-b dark:from-slate-800 dark:via-[#111] dark:to-black  ">
+    <section id="features" className="w-full py-20 px-4 md:px-20 bg-white dark:bg-gradient-to-b dark:from-zinc-900 dark:via-[#111] dark:to-black  ">
       <div className="max-w-7xl mx-auto">
         {/* Section Header */}
         <motion.div
@@ -92,7 +92,7 @@ const FeaturesGrid = () => {
         </motion.div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="flex flex-wrap gap-2 justify-center items-center">
           {features.map((feature, index) => (
             <motion.div
               key={index}
@@ -105,9 +105,9 @@ const FeaturesGrid = () => {
                 y: -10,
                 transition: { duration: 0.3 },
               }}
-              className="group relative"
+              className="group relative min-w-[200px] w-full md:w-[48%] lg:w-[23%] h-[250px]  "
             >
-              <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 dark:border-slate-700 h-full">
+              <div className="bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 dark:border-slate-700 h-full">
                 <div className="flex items-center px-2 gap-3 ">
                 <div
                   className={`w-10 h-10 bg-gradient-to-r ${feature.gradient} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}
@@ -120,7 +120,7 @@ const FeaturesGrid = () => {
                   {feature.title}
                 </h3>
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm">
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm px-6">
                   {feature.description}
                 </p>
 
@@ -139,7 +139,7 @@ const FeaturesGrid = () => {
           viewport={{ once: true }}
           className="text-center mt-16"
         >
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:bg-gradient-to-tr dark:from-black dark:via-[#111] dark:via-purple-900 dark:via-[#111] dark:to-black rounded-3xl p-8 border border-purple-100 dark:border-purple-900 dark:shadow-md dark:shadow-purple-700">
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:bg-gradient-to-bl dark:from-purple-900/30 dark:to-indigo-900/20 rounded-3xl p-8 border border-purple-100 dark:border-none dark:shadow-sm dark:shadow-purple-700">
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               Ready to Experience the Difference?
             </h3>

@@ -7,7 +7,7 @@ import CallToActionSection from "./components/CallToActionSection";
 
 function InfoSection() {
   return (
-    <div className="w-full">
+    <div className="w-screen overflow-x-hidden">
       <HeroSection />
       <FeaturesGrid />
       <StatsSection />

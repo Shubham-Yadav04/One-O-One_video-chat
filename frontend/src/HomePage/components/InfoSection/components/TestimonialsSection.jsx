@@ -70,7 +70,7 @@ const TestimonialsSection = () => {
   };
 
   return (
-    <section id="about" className="py-20 px-4 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-black dark:via-[#111] dark:to-slate-900">
+    <section id="about" className="w-full py-20 px-4 md:px-20 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-[#111]">
       <div className="max-w-7xl mx-auto">
         {/* Section Header */}
         <motion.div
@@ -100,7 +100,7 @@ const TestimonialsSection = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.5 }}
-            className="bg-white dark:bg-gradient-to-br dark:from-[#111] dark:via-purple-800 dark:to-black rounded-3xl p-8 md:p-12 shadow-2xl border border-gray-100 dark:border-slate-700"
+            className="bg-white dark:bg-gradient-to-bl dark:from-purple-900 dark:to-indigo-900 rounded-3xl p-8 md:p-12 shadow-2xl border border-gray-100 dark:border-slate-700"
           >
           
             <div className="text-3xl text-purple-200 dark:text-purple-400 mb-2">

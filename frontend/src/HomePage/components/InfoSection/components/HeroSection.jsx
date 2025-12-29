@@ -45,7 +45,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative py-20 px-4 bg-gradient-to-b from-slate-50 via-blue-50 to-indigo-100 dark:from-black dark:via-[#111] dark:to-slate-800 overflow-hidden">
+    <section className="w-full relative py-20 px-4 md:px-20 bg-gradient-to-b from-slate-50 via-blue-50 to-indigo-100 dark:from-black dark:via-[#111] dark:to-zinc-900 overflow-hidden">
    
       <div className="absolute inset-0 overflow-hidden">
         

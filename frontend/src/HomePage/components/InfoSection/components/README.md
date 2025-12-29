@@ -3,7 +3,6 @@
 This directory contains all the components that make up the comprehensive InfoSection for the video chat application.
 
 ## Components Overview
-
 ### 1. HeroSection.jsx
 
 - **Purpose**: Main hero section with compelling messaging about the video chat platform
